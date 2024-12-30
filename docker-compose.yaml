@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  roach1:
+    image: cockroachdb/cockroach:latest
+    ports:
+      - "26257:26257" # SQL port
+      - "8080:8080" # UI port
+    command: start --join=roach1,roach2,roach3 --insecure
+    volumes:
+      - roach1-data:/cockroach/cockroach-data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - roachnet
+
+  roach2:
+    image: cockroachdb/cockroach:latest
+    command: start --join=roach1,roach2,roach3 --insecure
+    volumes:
+      - roach2-data:/cockroach/cockroach-data
+    networks:
+      - roachnet
+
+  roach3:
+    image: cockroachdb/cockroach:latest
+    command: start --join=roach1,roach2,roach3 --insecure
+    volumes:
+      - roach3-data:/cockroach/cockroach-data
+    networks:
+      - roachnet
+
+  roach-init:
+    image: cockroachdb/cockroach:latest
+    networks:
+      - roachnet
+    depends_on:
+      - roach1
+      - roach2
+      - roach3
+    command: init --host=roach1 --insecure
+
+  db-init:
+    image: cockroachdb/cockroach:latest
+    networks:
+      - roachnet
+    volumes:
+      - ./init.sql:/init.sql
+    depends_on:
+      - roach-init
+    command: sql --host=roach1 --insecure --file=/init.sql
+  # app:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: dotnet-app
+  #   depends_on:
+  #     - crdb-init
+  #   environment:
+  #     - ConnectionStrings__DefaultConnection=Host={host};Port={port};Database={db};Username={username};Password={password};
+  #   networks:
+  #     - app-network
+
+networks:
+  roachnet:
+    driver: bridge
+
+volumes:
+  roach1-data:
+  roach2-data:
+  roach3-data:
